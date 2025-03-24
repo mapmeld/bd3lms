@@ -1,0 +1,6 @@
+train: InstaDeepAI/plant-multi-species-genomes
+valid: dnagpt/human_genome_GCF_009914755.1
+tokenizer_name_or_path: InstaDeepAI/agro-nucleotide-transformer-1b
+cache_dir: /tmp/data
+wrap: True
+streaming: True
