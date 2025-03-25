@@ -409,7 +409,7 @@ def get_dataset(
       revision=revision)
 
   if dataset_name in ['lambada', 'openwebtext-train',
-      'openwebtext-valid', 'InstaDeepAI/plant-multi-species-genomes']:
+      'openwebtext-valid', 'InstaDeepAI/plant-multi-species-genomes', 'monsoon-nlp/wheat-bees']:
     data = dataset
   elif dataset_name in ['dnagpt/human_genome_GCF_009914755.1']:
     data = dataset['test']
