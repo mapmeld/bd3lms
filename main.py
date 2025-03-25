@@ -170,7 +170,7 @@ def _train(config, logger, tokenizer):
   if config.training.from_pretrained is not None and ckpt_path is None:
     logger.info(f'Loading pretrained model from {config.training.from_pretrained}')
     # load pretraining checkpoint
-    if 'kuleshov-group/' in config.training.from_pretrained:
+    if 'monsoon' in config.training.from_pretrained:
       # load from hf
       model = diffusion.Diffusion(config, tokenizer=tokenizer)
       state_dict = transformers.AutoModelForMaskedLM.from_pretrained(
