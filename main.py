@@ -139,9 +139,9 @@ def _ppl_eval(config, logger, tokenizer):
   _, valid_ds = dataloader.get_dataloaders(
     config, tokenizer, skip_train=True, valid_seed=seed)
   trainer.validate(model, valid_ds)
-  
+
 def _train(config, logger, tokenizer):
-  logger.info('Startinfg Training.')
+  logger.info('Starting Training.')
   wandb_logger = None
   if config.get('wandb', None) is not None:
     wandb_logger = L.pytorch.loggers.WandbLogger(
@@ -170,7 +170,7 @@ def _train(config, logger, tokenizer):
   if config.training.from_pretrained is not None and ckpt_path is None:
     logger.info(f'Loading pretrained model from {config.training.from_pretrained}')
     # load pretraining checkpoint
-    if 'kuleshov-group/' in config.training.from_pretrained:
+    if 'monsoon' in config.training.from_pretrained:
       # load from hf
       model = diffusion.Diffusion(config, tokenizer=tokenizer)
       state_dict = transformers.AutoModelForMaskedLM.from_pretrained(

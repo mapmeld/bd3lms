@@ -409,7 +409,7 @@ def get_dataset(
       revision=revision)
 
   if dataset_name in ['lambada', 'openwebtext-train',
-      'openwebtext-valid', 'InstaDeepAI/plant-multi-species-genomes', 'monsoon-nlp/wheat-bees']:
+      'openwebtext-valid', 'InstaDeepAI/plant-multi-species-genomes', 'plant-multi-species-genomes', 'monsoon-nlp/wheat-bees', 'wheat-bees', 'instadeep']:
     data = dataset
   elif dataset_name in ['dnagpt/human_genome_GCF_009914755.1']:
     data = dataset['test']
@@ -444,6 +444,8 @@ def get_dataset(
       text = example['sentence']
     elif 'scientific_papers' in dataset_name:
       text = example['article']
+    elif 'wheat' in dataset_name or 'plant' in dataset_name:
+      text = example['sequence']
     else:
       text = example['text']
     
@@ -498,6 +500,9 @@ def get_dataset(
   elif dataset_name == 'ag_news':
     tokenized_dataset = tokenized_dataset.remove_columns(
       ['text', 'label'])
+  elif 'monsoon' in dataset_name or 'plant' in dataset_name:
+      tokenized_dataset = tokenized_dataset.remove_columns([
+        'sequence', 'description', 'start_pos', 'end_pos'])
   else:
     tokenized_dataset = tokenized_dataset.remove_columns(
       'text')
