@@ -498,7 +498,8 @@ class Diffusion(L.LightningModule):
       xt = torch.where(move_indices, self.mask_index, x)
       xt = xt.reshape(xt.shape[0], -1, block_size)
       perc_masked = (xt == self.mask_index).float().sum(-1) / block_size
-
+    return xt
+  
   def q_xt(
       self, x, p, block_size=None, sampling_eps_min=None, sampling_eps_max=None):
     """Computes the noisy sample xt.
