@@ -100,14 +100,14 @@ class Diffusion(L.LightningModule):
         decay=self.config.training.ema)
     else:
       self.ema = None
-    
+
     self.var_min = self.config.algo.var_min
     if self.var_min:
       self.register_buffer('sampling_eps_min', torch.tensor(
         self.config.training.sampling_eps_min))
       self.register_buffer('sampling_eps_max', torch.tensor(
         self.config.training.sampling_eps_max))
-      
+
     self.time_conditioning = self.config.algo.time_conditioning
     self.neg_infinity = -1000000.0
     self.fast_forward_epochs = None
@@ -121,7 +121,7 @@ class Diffusion(L.LightningModule):
 
   def on_validation_model_zero_grad(self) -> None:
     '''
-    Small hack to avoid first validation on resume. 
+    Small hack to avoid first validation on resume.
     This will NOT work if the gradient accumulation step should be performed at this point.
     '''
     super().on_validation_model_zero_grad()
@@ -139,17 +139,17 @@ class Diffusion(L.LightningModule):
       assert not self.config.algo.time_conditioning
     if self.config.sampling.kv_cache:
       assert self.config.algo.name in {'ar', 'bd3lm'}
-      
+
     if self.parameterization in {'sedd'}:
       assert self.time_conditioning
-    
+
     if self.config.mode == 'sample_eval':
       assert self.config.model.attn_backend != 'flex', 'FlexAttention mask not supported at inference.'
     if self.config.model.attn_backend == 'flex':
       assert self.config.algo.name == 'bd3lm', 'Custom FlexAttention mask only supported for BD3LM.'
-      
+
   def to(self, *args, **kwargs):
-    self = super().to(*args, **kwargs) 
+    self = super().to(*args, **kwargs)
     self.metrics.to(*args, **kwargs)
     if hasattr(self.backbone, "block_diff_mask") and self.config.model.attn_backend == 'sdpa':
       self.backbone.block_diff_mask = self.backbone.block_diff_mask.to(*args, **kwargs)
@@ -275,12 +275,12 @@ class Diffusion(L.LightningModule):
   def _subs_parameterization(self, logits, xt):
     # log prob at the mask index = - infinity
     logits[:, :, self.mask_index] += self.neg_infinity
-    
+
     # Normalize the logits such that x.exp() is
     # a probability distribution over vocab_size.
     logits = logits - torch.logsumexp(logits, dim=-1,
                                       keepdim=True)
-    
+
     # Apply updates directly in the logits matrix.
     # For the logits of the unmasked tokens, set all values
     # to -infinity except for the indices corresponding to
@@ -330,7 +330,7 @@ class Diffusion(L.LightningModule):
           logits = logits[:, :, :4100] # avoid single-nucleotide and N unknown nucleotide
       elif self.config.algo.name == 'ar':
         if self.config.algo.backbone == 'hf_dit':
-          logits = self.backbone(x, None)     
+          logits = self.backbone(x, None)
         else:
           logits = self.backbone(x, sigma, sample_mode=sample_mode, store_kv=store_kv)
         logits[:, :, self.mask_index] = self.neg_infinity
@@ -348,7 +348,7 @@ class Diffusion(L.LightningModule):
                                         xt=x,
                                         sigma=sigma)
     return logits
-    
+
   def on_train_epoch_start(self):
     self.backbone.train()
     self.noise.train()
@@ -402,7 +402,7 @@ class Diffusion(L.LightningModule):
                on_epoch=True,
                on_step=False,
                sync_dist=True)
-  
+
   def _check_val_sampling_intvl(self, sampling_eps_min, sampling_eps_max):
     """Checks if the current sampling interval is valid for reporting likelihood."""
     if (sampling_eps_min == 1e-3 \
@@ -412,7 +412,7 @@ class Diffusion(L.LightningModule):
     elif (self.block_size == 1 and sampling_eps_min >= 1):
       return True # nll (block size 1)
     return False # not a valid elbo (biased estimate)
-      
+
   def validation_step(self, batch, batch_idx):
     if self.var_min:
       for noise_clip_start in self.metrics.valid_vars.keys():
@@ -474,7 +474,7 @@ class Diffusion(L.LightningModule):
                       'monitor': 'val/loss',
                       'name': 'trainer/lr'}
     return [optimizer], [scheduler_dict]
-  
+
   def _resample_q_xt(
       self, x, xt, move_indices, p, block_size, sampling_eps_min, sampling_eps_max):
     """Resamples x_t if the percentage of masked tokens is outside the bounds
@@ -500,14 +500,14 @@ class Diffusion(L.LightningModule):
       xt = xt.reshape(xt.shape[0], -1, block_size)
       perc_masked = (xt == self.mask_index).float().sum(-1) / block_size
     return xt
-  
+
   def q_xt(
       self, x, p, block_size=None, sampling_eps_min=None, sampling_eps_max=None):
     """Computes the noisy sample xt.
 
     Args:
       x: int torch.Tensor with shape (batch_size,
-          diffusion_model_input_length), input. 
+          diffusion_model_input_length), input.
       p: float torch.Tensor with shape (batch_size, 1).
       block_size: int, block size.
       sampling_eps_min: float, minimum percentage of masked tokens.
@@ -515,7 +515,7 @@ class Diffusion(L.LightningModule):
     """
     if block_size is None:
       block_size = self.block_size
-  
+
     move_indices = torch.rand(
       * x.shape, device=x.device) <= p
     xt = torch.where(move_indices, self.mask_index, x)
@@ -571,7 +571,7 @@ class Diffusion(L.LightningModule):
         p_x0 = self.forward(x[:, -self.block_size:],
                         sigma_t,
                         sample_mode=True).to(torch.float64)
-      else:   
+      else:
         p_x0 = self.forward(x,
                           sigma_t,
                           sample_mode=True).to(torch.float64)
@@ -629,7 +629,7 @@ class Diffusion(L.LightningModule):
           x[:, :i + 1][:, -context_len:],
           None,
           store_kv=self.config.sampling.kv_cache)[:, -1:].to(torch.float64)
-    
+
         next_logits = next_logits.exp()
         next_logits = self._nucleus_sample(next_logits).log()
         y = (next_logits[:, -1] + noise).argmax(-1)
@@ -645,7 +645,7 @@ class Diffusion(L.LightningModule):
           break
         x[:, i + 1] = y
       return x
-  
+
   @torch.no_grad()
   def _sample(
     self, seqlen=None, num_steps=None, eps=1e-5, batch_size_per_gpu=None):
@@ -665,7 +665,7 @@ class Diffusion(L.LightningModule):
             raise ValueError('Sampling failed.')
         samples.append(sample_i)
         self.metrics.gen_nfes.append(self.config.model.length)
-      samples = torch.cat(samples, dim=0) 
+      samples = torch.cat(samples, dim=0)
       return self.tokenizer.batch_decode(samples)
     if self.sampler == 'semi_ar':
       for _ in range(self.config.sampling.num_sample_batches):
@@ -674,7 +674,7 @@ class Diffusion(L.LightningModule):
           num_tries += 1
           sample_i, nfes = self._semi_ar_sampler(
             n_samples=batch_size_per_gpu,
-            num_strides=(seqlen // self.block_size), 
+            num_strides=(seqlen // self.block_size),
             num_steps=num_steps,
             seqlen=seqlen)
           if num_tries > 10:
@@ -698,7 +698,7 @@ class Diffusion(L.LightningModule):
         samples.append(sample_i)
         self.metrics.nfes.update(nfes)
         self.metrics.gen_nfes.append(nfes)
-    samples = torch.cat(samples, dim=0) 
+    samples = torch.cat(samples, dim=0)
     return self.tokenizer.batch_decode(samples)
 
   def _sigma_from_p(self, p):
@@ -706,7 +706,7 @@ class Diffusion(L.LightningModule):
 
   def restore_model_and_sample(self, num_steps, eps=1e-5, seqlen=None):
     """Generate samples from the model."""
-    if self.ema:  
+    if self.ema:
       self.ema.store(self._get_parameters())
       self.ema.copy_to(self._get_parameters())
     self.backbone.eval()
@@ -815,7 +815,7 @@ class Diffusion(L.LightningModule):
       input_tokens = x0
       output_tokens = None
       new_attention_mask = attention_mask
-    
+
     return input_tokens, output_tokens, new_attention_mask
 
   def _forward_pass_diffusion(self, x0, t=None, sampling_eps_min=None, sampling_eps_max=None):
@@ -844,7 +844,7 @@ class Diffusion(L.LightningModule):
       loss_scale = - torch.ones_like(loss_scale)
     if self.ignore_bos:
       xt[:, 0] = x0[:, 0]
-    
+
     x_input = xt
     if self.cross_attn:
       x_input = torch.cat((xt, x0), dim=-1)
@@ -882,10 +882,10 @@ class Diffusion(L.LightningModule):
         input_tokens,
         sampling_eps_min=sampling_eps_min,
         sampling_eps_max=sampling_eps_max,)
-    
+
     if self.ignore_bos and not self.training:
       attention_mask[:, 0] = 0
-      
+
     nlls = (loss * attention_mask)
     token_nll = nlls.sum() / attention_mask.sum()
     return Loss(loss=token_nll,
@@ -955,7 +955,7 @@ class Diffusion(L.LightningModule):
 
   @torch.no_grad
   def _analytic_sampler(
-    self, n_samples, num_steps, seqlen, eps=1e-5): 
+    self, n_samples, num_steps, seqlen, eps=1e-5):
     x = self._sample_prior(
       n_samples,
       seqlen).to(self.device)
@@ -967,11 +967,11 @@ class Diffusion(L.LightningModule):
       t = timesteps[i] * torch.ones(
         x.shape[0], 1, device=self.device)
       x = self._analytic_update(x=x, t=t, dt=dt)
-    # denoising step 
+    # denoising step
     t = timesteps[-1] * torch.ones(x.shape[0], 1,
                                   device=self.device)
     x = self._denoiser_update(x=x, t=t)
-    
+
     stop, x = self._check_stop_conds(x)
     if stop:
       return None
@@ -983,7 +983,7 @@ class Diffusion(L.LightningModule):
     if seqlen is None:
       seqlen = self.config.model.length
     sampling_steps = 0
-          
+
     mdlm_semi_ar = self.config.algo.name == 'mdlm' and self.config.model.length > self.block_size
     if mdlm_semi_ar:
       # sliding window of length 512 for mdlm semi-ar decoding
@@ -992,7 +992,7 @@ class Diffusion(L.LightningModule):
 
     ones = torch.ones((n_samples,1), dtype=self.dtype,
                       device=self.device)
-    
+
     # reset kvs
     if self.config.sampling.kv_cache:
       self.backbone.reset_kv_cache(eval_batch_size=self.config.loader.eval_batch_size)
@@ -1029,7 +1029,7 @@ class Diffusion(L.LightningModule):
           u = np.random.rand()
           num_masked = (x_accum[:, fwd_idx] == self.mask_index).sum(-1).item()
           t *= u**(1 / num_masked)
-              
+
         elif not self.config.sampling.first_hitting:
           t = timesteps[i]
 
@@ -1040,7 +1040,7 @@ class Diffusion(L.LightningModule):
             p_x0=p_x0_cache,)
         if p_x0_cache is None:
           sampling_steps += 1
-       
+
         x_accum[:, fwd_idx] = x_next
 
       # check if we need to resample (or stop sampling for variable-length sampling)
@@ -1052,16 +1052,16 @@ class Diffusion(L.LightningModule):
         elif stop:
           break
     return x_accum, sampling_steps
-  
+
   def _compute_entropy(self, x):
     _, counts = torch.unique(x, return_counts=True, sorted=False)
     entropy = torch.special.entr(counts.float() / counts.sum()).sum()
     return entropy
-  
+
   def _check_stop_conds(self, x):
     """Check if sampling should stop based on 1) eos, 2) entropy, or 3) likelihood.
     Entropy/likelihood evaluated on last 256 token-block.
-    
+
     Args:
       x: torch.Tensor, current sample.
     Returns:
