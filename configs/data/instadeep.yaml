@@ -1,6 +1,6 @@
 train: monsoon-nlp/wheat-bees
 valid: dnagpt/human_genome_GCF_009914755.1
-tokenizer_name_or_path: monsoon-nlp/dna-blockdiff
+tokenizer_name_or_path: monsoon-nlp/dna-blockdiff-2
 cache_dir: /tmp/data
 wrap: True
 streaming: False

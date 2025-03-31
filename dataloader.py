@@ -629,6 +629,10 @@ def get_dataloaders(config, tokenizer, skip_train=False,
   if skip_train:
     train_loader = None
   else:
+    try:
+      train_set = train_set['train']
+    except:
+      print("idk train split")
     train_loader = torch.utils.data.DataLoader(
       train_set,
       batch_size=config.loader.batch_size,
