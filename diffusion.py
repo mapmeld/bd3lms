@@ -326,7 +326,8 @@ class Diffusion(L.LightningModule):
         logits = self.backbone(x, sigma,
                               store_kv=store_kv,
                               sample_mode=sample_mode)
-        logits = logits[:, :, :4100] # avoid single-nucleotide and N unknown nucleotide
+        if self.config.algo.sampler != 'analytic':
+          logits = logits[:, :, :4100] # avoid single-nucleotide and N unknown nucleotide
       elif self.config.algo.name == 'ar':
         if self.config.algo.backbone == 'hf_dit':
           logits = self.backbone(x, None)     
