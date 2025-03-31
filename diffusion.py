@@ -326,6 +326,7 @@ class Diffusion(L.LightningModule):
         logits = self.backbone(x, sigma,
                               store_kv=store_kv,
                               sample_mode=sample_mode)
+        logits = logits[:, :, :4100] # avoid single-nucleotide and N unknown nucleotide
       elif self.config.algo.name == 'ar':
         if self.config.algo.backbone == 'hf_dit':
           logits = self.backbone(x, None)     
@@ -497,8 +498,7 @@ class Diffusion(L.LightningModule):
       xt = torch.where(move_indices, self.mask_index, x)
       xt = xt.reshape(xt.shape[0], -1, block_size)
       perc_masked = (xt == self.mask_index).float().sum(-1) / block_size
-    return xt
-  
+
   def q_xt(
       self, x, p, block_size=None, sampling_eps_min=None, sampling_eps_max=None):
     """Computes the noisy sample xt.
@@ -621,7 +621,7 @@ class Diffusion(L.LightningModule):
         # need to sample a gumbel for each token
         # to save memory in variable-length sampling
         noise = (torch.distributions.Gumbel(0, 1)
-                .sample((bsz, self.vocab_size - 8))
+                .sample((bsz, self.vocab_size))
                 .to(self.device))
         next_logits = self.forward(
           x[:, :i + 1][:, -context_len:],
