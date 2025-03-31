@@ -621,7 +621,7 @@ class Diffusion(L.LightningModule):
         # need to sample a gumbel for each token
         # to save memory in variable-length sampling
         noise = (torch.distributions.Gumbel(0, 1)
-                .sample((bsz, self.vocab_size))
+                .sample((bsz, self.vocab_size - 8))
                 .to(self.device))
         next_logits = self.forward(
           x[:, :i + 1][:, -context_len:],
