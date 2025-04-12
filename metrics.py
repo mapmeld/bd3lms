@@ -7,6 +7,7 @@ import transformers
 import os
 import torch.nn.functional as F
 from tqdm import tqdm
+from evo2.models import Evo2
 import math
 
 LOG2 = torch.log(torch.tensor(2.0))
@@ -156,77 +157,15 @@ class Metrics:
     stride=512,
     device='cuda') -> None:
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-    eval_model = transformers.AutoModelForCausalLM.from_pretrained(
-      self.gen_ppl_eval_model_name_or_path).eval()
-    if 'llama2' not in self.gen_ppl_eval_model_name_or_path:
-      eval_model = eval_model.to(device)
-    # Re-tokenize using eval model's tokenizer
-    if retokenize:
-      (samples, attn_mask,
-       eval_context_size) = self._eval_retokenize(
-         text_samples, max_length=max_length, device=device)
-    else:
-      samples = text_samples
-      attn_mask = torch.ones(samples.shape).to(device)
-      eval_context_size = samples.shape[-1]
-    if batch_size is None:
-      batch_size = min(self.eval_ppl_batch_size,
-                      samples.shape[0])
-
-    num_batches = samples.shape[0] // batch_size
-    for i in range(num_batches):
-      samples_batch = samples[i * batch_size: (i + 1) * batch_size]
-      attn_mask_batch = attn_mask[i * batch_size: (i + 1) * batch_size]
-
-      nlls_accum = torch.zeros_like(samples_batch, dtype=torch.float32)
-      valid_tokens_accum = torch.zeros_like(samples_batch, dtype=torch.float32)
-
-      num_strides = math.ceil((samples_batch.shape[-1] - eval_context_size + stride) / stride)
-      num_strides = max(num_strides, 1)
-
-      # Computes Gen. PPL in a sliding window for sequences longer than eval_context_size
-      for i in tqdm(range(num_strides), desc='Sliding Window Gen PPL'):
-        if i == 0:
-          # for the first stride, use the entire eval_context_size
-          start = 0
-          end = min(eval_context_size, samples_batch.shape[-1])
-        else:
-          # then, move the window by stride
-          start = i * stride
-          end = min(start + eval_context_size, samples_batch.shape[-1])
-        sample_chunk = samples_batch[..., start:end]
-        attn_mask_chunk = attn_mask_batch[..., start:end]
-
-        logits = eval_model(sample_chunk, attention_mask=attn_mask_chunk)[0]
-        logits = logits.transpose(-1, -2)
-        
-        nlls = F.cross_entropy(logits[..., :-1], sample_chunk[..., 1:], reduction='none')
-        valid_tokens = (sample_chunk[..., 1:] != self.tokenizer.eos_token_id).to(torch.float)
-        
-        if i == 0:
-          # for the first stride, update the nlls of the entire eval_context_size
-          nlls_accum[..., start + 1:end] += nlls
-          valid_tokens_accum[..., start + 1:end] += valid_tokens
-        else:
-          # only update the nlls of the last stride
-          update_start = (start+eval_context_size-stride)
-          update_window = end - update_start
-          nlls_accum[...,update_start:end] += nlls[..., -update_window:]
-          valid_tokens_accum[..., update_start:end] += valid_tokens[..., -update_window:]
-          
-      # gen ppl
-      avg_nll = (nlls_accum * valid_tokens_accum).sum() / valid_tokens_accum.sum()
-      self.gen_ppls.append(avg_nll.exp().detach().cpu().item())
-      self.gen_ppl.update(nlls_accum, valid_tokens_accum)
-
-      # entropy
-      entropy_full = 0
-      for i in range(samples_batch.shape[0]):
-        _, counts = torch.unique(samples_batch[i], return_counts=True, sorted=False)
-        entropy = torch.special.entr(counts.float() / counts.sum()).sum()
-        entropy_full += entropy
-      self.gen_entropies.append(entropy_full.detach().cpu().item())
-      self.gen_entropy.update(entropy_full, samples_batch.shape[0])
+    if 'arcinstitute/evo2' not in self.gen_ppl_eval_model_name_or_path:
+        raise Exception('Reprogrammed perplexity reporting for evo')
+    eval_model = Evo2(self.gen_ppl_eval_model_name_or_path.split('/')[1])
+    ref_scores = eval_model.score_sequences(text_samples)
+    accum = 0
+    for score, idx in enumerate(ref_scores):
+      self.gen_ppls.append(score)
+      self.gen_ppl.update(accum, score)
+      accum += score
 
       # record sample length
-      self.gen_lengths.append(valid_tokens_accum.sum().detach().cpu().item())
+      self.gen_lengths.append(math.ceil(len(ref_scores[idx] / 6)))
