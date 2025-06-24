@@ -405,7 +405,7 @@ def get_dataset(
       dataset_name,
       cache_dir=cache_dir,
       streaming=streaming,
-      trust_remote_code=True,
+      chunk_length=10000,
       revision=revision)
 
   if dataset_name in ['lambada', 'openwebtext-train',
